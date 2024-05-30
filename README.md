@@ -18,9 +18,11 @@ The shape of the pixels are defined by the following parameters:
 
 The material properties used as inputs for the field solving steps are:
 
-| Material Property         | Value |
-| ------------------------- | ----- |
-| LAr relative permittivity | 1.505 |
+| Material Property         | Value     |
+| ------------------------- | --------- |
+| LAr relative permittivity | 1.505[^1] |
+
+[^1] Dielectric Constants of Liquefied Noble Gases and Methane [https://doi.org/10.1063/1.1724850](https://doi.org/10.1063/1.1724850)
 
 ### Drift Field
 
