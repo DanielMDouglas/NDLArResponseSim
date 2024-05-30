@@ -53,7 +53,7 @@ targetShape = target.shape
     # return cutoff_response
 
 optimizer = torch.optim.Adam(sirenModel.parameters(),
-                             lr = 1.e-5)
+                             lr = 1.e-6)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
 
 n_iter = 100000
