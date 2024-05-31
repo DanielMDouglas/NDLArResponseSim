@@ -7,7 +7,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 import tqdm
 
-response_table = np.load('response/response_38.npy')
+response_table = np.load('../../response_tables/response_38.npy')
 print ("response_table", response_table)
 
 print (response_table.shape)
@@ -15,21 +15,25 @@ plt.plot(response_table[0,0,:])
 plt.savefig('response.png')
 
 # just take the first four curves along the x = 0 line
-target = torch.Tensor(response_table[:4,0,:]).to(device)
+target = torch.Tensor(response_table[:5,:5,:]).to(device)
 
 from model import *
-sirenModel = nn.Sequential(Siren(len(target.shape), 128, 3, 1,
+print (target.shape, len(target.shape))
+sirenModel = nn.Sequential(Siren(len(target.shape), 128, 4, 1,
                                  outermost_linear = True,
-                                 first_omega_0 = 200,
-                                 hidden_omega_0 = 200),
+                                 # first_omega_0 = 200,
+                                 # hidden_omega_0 = 200,
+                                 first_omega_0 = 15,
+                                 hidden_omega_0 = 15,
+),
                            # final_activation(),
-                           )
+                           ).to(device)
 
 domain = torch.cartesian_prod(*[torch.arange(dim, dtype = torch.float)
                                 # torch.arange(target.shape[1], dtype = torch.float),
                                 # torch.arange(target.shape[2], dtype = torch.float),
                                 for dim in target.shape]
-                              )
+                              ).to(device)
 domain /= np.max(target.shape)
 domain *= 2
 domain -= 1
@@ -53,10 +57,10 @@ targetShape = target.shape
     # return cutoff_response
 
 optimizer = torch.optim.Adam(sirenModel.parameters(),
-                             lr = 1.e-5)
+                             lr = 1.e-6)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
 
-n_iter = 100000
+n_iter = 1000000
 pbar = tqdm.tqdm(range(n_iter))
 for i in pbar:
     inference, coords = sirenModel(domain)
@@ -69,38 +73,48 @@ for i in pbar:
                             str(round(loss.item(), 4))])
     pbar.set_description(pbarMessage)
 
-    if not i%10:
+    if not i%1000:
         # print ("inf shape", inference.shape)
-        curve_model(inference)
+        # print ("target shape", targetShape)
+        # curve_model(inference)
         # plt.imshow(inference.detach().numpy().reshape(targetShape))
-        colors = ['red', 'green', 'blue', 'orange']
-        fig, axes = plt.subplots(4, 1, sharex = True)
+        colors = 5*['red', 'green', 'blue', 'orange', 'grey']
+        current_fig, current_axes = plt.subplots(5*5, 1,
+                                                 sharex = True,
+                                                 figsize = [6.4, 9.6])
+        current_fig.subplots_adjust(hspace = 0)
+        diff_fig, diff_axes = plt.subplots(5*5, 1,
+                                           sharex = True,
+                                           figsize = [6.4, 9.6])
+        diff_fig.subplots_adjust(hspace = 0)
         for i, c in enumerate(colors):
-            axes[i].plot(target[i,:],
-                         color = c)
-            axes[i].plot(inference.detach().numpy().reshape(targetShape)[i,:],
-                         color = c,
-                         ls = '--')
-        plt.xlim(3600, 3800)
-        plt.savefig('currentInf.png')
+            # indexTuple = ((i//4)-1, i%4, :)
+            current_axes[i].plot(target[(i//5)-1,i%5,:].cpu().numpy(),
+                                 color = c)
+            current_axes[i].plot(inference.detach().cpu().numpy().reshape(targetShape)[(i//5)-1,i%5,:],
+                                 color = c,
+                                 ls = '--')
+            current_axes[i].set_xlim(3725, 3800)
+            current_axes[i].set_ylim(-0.2, 6)
 
-        # fig = plt.figure()
-        # # inference.backward()
-        # grad = gradient(inference, coords)
-        # plt.imshow(grad.norm(dim = -1).detach().numpy().reshape(targetShape[:-1]))
-        # plt.savefig('currentInfGrad.png')
+            diff_axes[i].plot(target[(i//5)-1,i%5,:].cpu().numpy() -\
+                              inference.detach().cpu().numpy().reshape(targetShape)[(i//5)-1,i%5,:],
+                              color = c)
+            diff_axes[i].axhline(y = 0,
+                                 ls = '--',
+                                 color = c)
+            diff_axes[i].set_xlim(3725, 3800)
+            diff_axes[i].set_ylim(-0.5, 0.5)
 
-        # fig = plt.figure()
-        # # inference.backward()
-        # lapl = laplace(inference, coords)
-        # plt.imshow(lapl.detach().numpy().reshape(targetShape[:-1]))
-        # plt.savefig('currentInfLapl.png')
+            if not i == 15:
+                current_axes[i].tick_params(bottom = False)
+                diff_axes[i].tick_params(bottom = False)
+                current_axes[i].set_yticklabels([])
+                diff_axes[i].set_yticklabels([])
+                
+        current_fig.savefig('currentInf.png')
+        diff_fig.savefig('diff.png')
 
-        # fig = plt.figure()
-        # inference.backward()
-        # grad = inference.grad()
-        # plt.imshow(grad.detach().numpy().reshape(targetShape))
-        # plt.savefig('currentInfGrad.png')
         scheduler.step()
 
     loss.backward()
